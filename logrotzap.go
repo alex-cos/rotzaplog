@@ -12,7 +12,17 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-func InitFileLogger(logpath string, level zapcore.LevelEnabler, verbose bool) *zap.Logger {
+type UTCClock struct{}
+
+func (UTCClock) Now() time.Time {
+	return time.Now().UTC()
+}
+
+func (UTCClock) NewTicker(duration time.Duration) *time.Ticker {
+	return time.NewTicker(duration)
+}
+
+func InitFileLogger(logpath string, level zapcore.LevelEnabler, utc bool, verbose bool) *zap.Logger {
 	var logger *zap.Logger
 
 	dir := filepath.Dir(logpath)
@@ -54,11 +64,14 @@ func InitFileLogger(logpath string, level zapcore.LevelEnabler, verbose bool) *z
 		)
 		logger = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
 	}
+	if utc {
+		logger.WithOptions(zap.WithClock(UTCClock{}))
+	}
 
 	return logger
 }
 
-func InitConsoleLogger(level zapcore.LevelEnabler) *zap.Logger {
+func InitConsoleLogger(level zapcore.LevelEnabler, utc bool) *zap.Logger {
 	var (
 		logger *zap.Logger
 		core   zapcore.Core
@@ -71,6 +84,9 @@ func InitConsoleLogger(level zapcore.LevelEnabler) *zap.Logger {
 		zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), level),
 	)
 	logger = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+	if utc {
+		logger.WithOptions(zap.WithClock(UTCClock{}))
+	}
 
 	return logger
 }
