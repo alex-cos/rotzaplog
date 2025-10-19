@@ -12,17 +12,12 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-type UTCClock struct{}
-
-func (UTCClock) Now() time.Time {
-	return time.Now().UTC()
-}
-
-func (UTCClock) NewTicker(duration time.Duration) *time.Ticker {
-	return time.NewTicker(duration)
-}
-
-func InitFileLogger(logpath string, level zapcore.LevelEnabler, utc bool, verbose bool) *zap.Logger {
+func InitFileLogger(
+	logpath string,
+	level zapcore.LevelEnabler,
+	utc bool,
+	verbose bool,
+) *zap.Logger {
 	var logger *zap.Logger
 
 	dir := filepath.Dir(logpath)
@@ -48,6 +43,11 @@ func InitFileLogger(logpath string, level zapcore.LevelEnabler, utc bool, verbos
 
 	config := zap.NewProductionEncoderConfig()
 	config.EncodeTime = zapcore.ISO8601TimeEncoder
+	if utc {
+		config.EncodeTime = zapcore.TimeEncoder(func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+			enc.AppendString(t.UTC().Format("2006-01-02T15:04:05.000"))
+		})
+	}
 	fileEncoder := zapcore.NewJSONEncoder(config)
 	writer := zapcore.AddSync(file)
 
@@ -64,9 +64,6 @@ func InitFileLogger(logpath string, level zapcore.LevelEnabler, utc bool, verbos
 		)
 		logger = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
 	}
-	if utc {
-		logger.WithOptions(zap.WithClock(UTCClock{}))
-	}
 
 	return logger
 }
@@ -79,14 +76,16 @@ func InitConsoleLogger(level zapcore.LevelEnabler, utc bool) *zap.Logger {
 
 	config := zap.NewProductionEncoderConfig()
 	config.EncodeTime = zapcore.ISO8601TimeEncoder
+	if utc {
+		config.EncodeTime = zapcore.TimeEncoder(func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+			enc.AppendString(t.UTC().Format("2006-01-02T15:04:05.000"))
+		})
+	}
 	consoleEncoder := zapcore.NewConsoleEncoder(config)
 	core = zapcore.NewTee(
 		zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), level),
 	)
 	logger = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
-	if utc {
-		logger.WithOptions(zap.WithClock(UTCClock{}))
-	}
 
 	return logger
 }
